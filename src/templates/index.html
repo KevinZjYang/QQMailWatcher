@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QQ邮箱监控</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .scheduler-status {
+            margin-top: 12px;
+            font-size: 14px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        .status-dot.green { background: #4ade80; }
+        .status-dot.gray { background: #9ca3af; }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #666;
+            font-weight: 500;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .rule-item {
+            background: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border: 1px solid #e5e7eb;
+        }
+        .rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .rule-header label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: #d1d5db;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .toggle.active {
+            background: #667eea;
+        }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .toggle.active::after {
+            transform: translateX(20px);
+        }
+        .schedule-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .schedule-tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #f3f4f6;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .schedule-tag button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #6b7280;
+            font-size: 16px;
+            line-height: 1;
+        }
+        .schedule-tag button:hover {
+            color: #ef4444;
+        }
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .log-table th,
+        .log-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+        .log-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #666;
+        }
+        .log-table tr:hover {
+            background: #f9fafb;
+        }
+        .status-success {
+            color: #10b981;
+        }
+        .status-failed {
+            color: #ef4444;
+        }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 9999;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .toast.success {
+            background: #10b981;
+            color: white;
+        }
+        .toast.error {
+            background: #ef4444;
+            color: white;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .email-item {
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .email-item h4 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        .email-item p {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .variable-hint {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .tabs {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div v-if="toast.show" :class="['toast', toast.type]">{{ toast.message }}</div>
+        <div class="header">
+            <h1>QQ邮箱监控</h1>
+            <div class="scheduler-status">
+                <span :class="['status-dot', schedulerStatus.running ? 'green' : 'gray']"></span>
+                <span v-if="schedulerStatus.enabled">
+                    <span v-if="schedulerStatus.in_time_range">运行中</span>
+                    <span v-else>等待时间段</span>
+                </span>
+                <span v-else>已停止</span>
+                <span style="margin-left: 16px;">当前时间: {{ schedulerStatus.current_time }}</span>
+                <span v-if="schedulerStatus.next_run" style="margin-left: 16px;">下次检查: {{ schedulerStatus.next_run }}</span>
+                <span style="margin-left: 16px;">{{ schedulerStatus.start_time }} - {{ schedulerStatus.end_time }}</span>
+            </div>
+        </div>
+        <div class="container">
+            <div class="tabs">
+                <button class="tab" :class="{active: activeTab === 'config'}" @click="activeTab = 'config'">配置管理</button>
+                <button class="tab" :class="{active: activeTab === 'logs'}" @click="activeTab = 'logs'">运行日志</button>
+                <button class="tab" :class="{active: activeTab === 'action'}" @click="activeTab = 'action'">手动操作</button>
+            </div>
+
+            <!-- 配置管理 -->
+            <div v-if="activeTab === 'config'" class="card">
+                <h2>配置管理 <button class="btn btn-secondary" style="margin-left: 12px; padding: 4px 12px; font-size: 12px;" @click="exportConfig">导出</button><button class="btn btn-secondary" style="margin-left: 8px; padding: 4px 12px; font-size: 12px;" @click="triggerImport">导入</button><input type="file" ref="fileInput" style="display: none;" @change="importConfig" accept=".json"></h2>
+                <div class="form-group">
+                    <h3 style="margin-bottom: 16px; color: #333;">邮箱设置</h3>
+                    <div class="form-row">
+                        <div>
+                            <label>IMAP服务器</label>
+                            <input type="text" v-model="config.mail.imap_server" placeholder="imap.qq.com">
+                        </div>
+                        <div>
+                            <label>IMAP端口</label>
+                            <input type="number" v-model.number="config.mail.imap_port" placeholder="993">
+                        </div>
+                    </div>
+                    <div class="form-row" style="margin-top: 12px;">
+                        <div>
+                            <label>用户名（QQ邮箱）</label>
+                            <input type="text" v-model="config.mail.username" placeholder="your_email@qq.com">
+                        </div>
+                        <div>
+                            <label>授权码</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input :type="showPassword ? 'text' : 'password'" v-model="config.mail.password" placeholder="QQ邮箱授权码" style="flex: 1;">
+                                <button type="button" @click="showPassword = !showPassword" style="padding: 8px 12px; cursor: pointer;">{{ showPassword ? '隐藏' : '显示' }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" @click="saveMailConfig">保存</button>
+                        <button class="btn btn-secondary" @click="testMail">测试连接</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 24px;">
+                    <h3 style="margin-bottom: 16px; color: #333;">Webhook设置</h3>
+                    <label>企业微信Webhook URL</label>
+                    <input type="text" v-model="config.webhook.url" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx">
+                    <div class="btn-group" style="margin-top: 12px;">
+                        <button class="btn btn-primary" @click="saveWebhookConfig">保存</button>
+                        <button class="btn btn-secondary" @click="testWebhook">测试</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 24px;">
+                    <h3 style="margin-bottom: 16px; color: #333;">过滤规则</h3>
+                    <div class="form-row">
+                        <div>
+                            <label>邮件主题开头（可选）</label>
+                            <input type="text" v-model="config.filter.subject_startswith" placeholder="【监控】">
+                        </div>
+                        <div>
+                            <label>发件人（可选）</label>
+                            <input type="text" v-model="config.filter.sender" placeholder="sender@example.com">
+                        </div>
+                    </div>
+                    <div class="btn-group" style="margin-top: 12px;">
+                        <button class="btn btn-primary" @click="saveConfig">保存</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 24px;">
+                    <h3 style="margin-bottom: 16px; color: #333;">内容匹配规则</h3>
+                    <div class="form-group">
+                        <label>匹配模式</label>
+                        <select v-model="config.filter.content_match.mode">
+                            <option value="any">任一匹配（邮件内容匹配任一规则即可）</option>
+                            <option value="all">全部符合（邮件内容需匹配所有规则）</option>
+                        </select>
+                    </div>
+                    <!-- 测试匹配功能 -->
+                    <div class="form-group" style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                        <label>测试匹配</label>
+                        <textarea v-model="testContent" rows="3" placeholder="输入测试内容..."></textarea>
+                        <div class="btn-group" style="margin-top: 8px;">
+                            <button class="btn btn-secondary" @click="testMatch">测试</button>
+                        </div>
+                        <div v-if="testMatchResult" :class="['test-result', testMatchResult.length > 0 ? 'success' : 'error']" style="margin-top: 12px;">
+                            {{ testMatchResult.length > 0 ? '匹配成功！匹配了 ' + testMatchResult.length + ' 条规则' : '没有匹配任何规则' }}
+                            <div v-for="(r, i) in testMatchResult" :key="i" style="margin-top: 8px; padding: 8px; background: #fff; border-radius: 4px;">
+                                <strong>规则{{ i+1 }}:</strong> {{ r.pattern }}<br>
+                                <strong>消息:</strong> {{ r.message }}
+                            </div>
+                        </div>
+                    </div>
+                    <div v-for="(rule, index) in config.filter.content_match.rules" :key="rule.id" class="rule-item">
+                        <div class="rule-header">
+                            <label>
+                                <div class="toggle" :class="{active: rule.enabled}" @click="rule.enabled = !rule.enabled"></div>
+                                规则 {{ index + 1 }}
+                            </label>
+                            <button class="btn btn-danger" @click="removeRule(index)" v-if="config.filter.content_match.rules.length > 1">删除</button>
+                        </div>
+                        <div class="form-group">
+                            <label>正则表达式</label>
+                            <input type="text" v-model="rule.pattern" placeholder="如：关键词.*">
+                        </div>
+                        <div class="form-group">
+                            <label>消息模板</label>
+                            <textarea v-model="rule.message" rows="3" placeholder="【提醒】收到邮件：{subject}"></textarea>
+                            <div class="variable-hint">可用变量: {subject}, {sender}, {content}, {date}, {full_content}</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" @click="addRule">+ 添加规则</button>
+                    <div class="btn-group" style="margin-top: 12px;">
+                        <button class="btn btn-primary" @click="saveConfig">保存</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 24px;">
+                    <h3 style="margin-bottom: 16px; color: #333;">定时任务</h3>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" v-model="config.schedule.enabled" style="width: auto; margin: 0;"> 启用定时任务
+                        </label>
+                    </div>
+                    <template v-if="config.schedule.enabled">
+                        <div class="form-row">
+                            <div>
+                                <label>开始时间</label>
+                                <input type="time" v-model="config.schedule.start_time">
+                            </div>
+                            <div>
+                                <label>结束时间</label>
+                                <input type="time" v-model="config.schedule.end_time">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 12px;">
+                            <label>检测间隔</label>
+                            <select v-model.number="config.schedule.interval_minutes">
+                                <option value="10">10分钟</option>
+                                <option value="15">15分钟</option>
+                                <option value="30">30分钟</option>
+                                <option value="60">1小时</option>
+                            </select>
+                        </div>
+                    </template>
+                    <div class="btn-group" style="margin-top: 12px;">
+                        <button class="btn btn-primary" @click="saveConfig">保存</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 运行日志 -->
+            <div v-if="activeTab === 'logs'" class="card">
+                <h2>运行日志</h2>
+                <button class="btn btn-secondary" @click="loadLogs" style="margin-bottom: 16px;">刷新</button>
+                <div v-if="loading" class="loading">加载中...</div>
+                <table v-else class="log-table">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>类型</th>
+                            <th>匹配数</th>
+                            <th>发送状态</th>
+                            <th>详情</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="log in logs" :key="log.id">
+                            <td>{{ log.timestamp }}</td>
+                            <td>{{ log.type === 'scheduled' ? '定时任务' : '手动触发' }}</td>
+                            <td>{{ log.matched_emails }}</td>
+                            <td :class="log.webhook_sent ? 'status-success' : 'status-failed'">
+                                {{ log.webhook_sent ? '成功' : '失败' }}
+                            </td>
+                            <td>{{ log.details }}</td>
+                        </tr>
+                        <tr v-if="logs.length === 0">
+                            <td colspan="5" style="text-align: center; color: #999;">暂无日志</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 手动操作 -->
+            <div v-if="activeTab === 'action'" class="card">
+                <h2>手动操作</h2>
+                <div class="btn-group">
+                    <button class="btn btn-success" @click="triggerCheck" :disabled="triggering">
+                        {{ triggering ? '检测中...' : '立即检测' }}
+                    </button>
+                </div>
+                <div v-if="triggerResult" :class="['test-result', triggerResult.success ? 'success' : 'error']" style="margin-top: 16px;">
+                    {{ triggerResult.message }}
+                </div>
+                <div v-if="triggerResult && triggerResult.matched_emails && triggerResult.matched_emails.length > 0" style="margin-top: 20px;">
+                    <h3 style="margin-bottom: 12px;">匹配的邮件</h3>
+                    <div v-for="(email, index) in triggerResult.matched_emails" :key="index" class="email-item">
+                        <h4>{{ email.subject }}</h4>
+                        <p><strong>发件人：</strong>{{ email.sender }}</p>
+                        <p><strong>匹配规则：</strong>{{ email.rule }}</p>
+                        <p><strong>内容摘要：</strong>{{ email.content }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+        createApp({
+            setup() {
+                const activeTab = ref('config');
+                const loading = ref(false);
+                const triggering = ref(false);
+                const config = ref({
+                    mail: { imap_server: 'imap.qq.com', imap_port: 993, username: '', password: '' },
+                    filter: { subject_startswith: '', sender: '', content_match: { mode: 'any', rules: [{ id: 1, pattern: '', message: '【提醒】收到邮件：{subject}\n发件人：{sender}\n内容：{content}', enabled: true }] } },
+                    schedule: { enabled: true, start_time: '09:00', end_time: '18:00', interval_minutes: 30 },
+                    webhook: { url: '' }
+                });
+                const logs = ref([]);
+                const schedulerStatus = ref({ running: false, enabled: true, in_time_range: false, current_time: '', next_run: null, start_time: '', end_time: '' });
+                const saveResult = ref(null);
+                const mailTestResult = ref(null);
+                const webhookTestResult = ref(null);
+                const showPassword = ref(false);
+                const testContent = ref('');
+                const testMatchResult = ref(null);
+                const triggerResult = ref(null);
+                const toast = ref({ show: false, message: '', type: 'success' });
+
+                const showToast = (message, type = 'success') => {
+                    toast.value = { show: true, message, type };
+                    setTimeout(() => { toast.value.show = false; }, 3000);
+                };
+
+                const loadConfig = async () => {
+                    try {
+                        const res = await fetch('/api/config');
+                        config.value = await res.json();
+                    } catch (e) { console.error('加载配置失败', e); }
+                };
+                const loadStatus = async () => {
+                    try {
+                        const res = await fetch('/api/status');
+                        schedulerStatus.value = await res.json();
+                    } catch (e) { console.error('加载状态失败', e); }
+                };
+                const saveConfig = async () => {
+                    // 保存整个配置（用于过滤规则、定时任务等）
+                    try {
+                        await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
+                        showToast('配置保存成功', 'success');
+                    } catch (e) { showToast('保存失败: ' + e.message, 'error'); }
+                };
+                const saveMailConfig = async () => {
+                    // 直接保存配置，不验证
+                    try {
+                        await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
+                        showToast('配置保存成功', 'success');
+                    } catch (e) { showToast('保存失败: ' + e.message, 'error'); }
+                };
+                const saveWebhookConfig = async () => {
+                    // 直接保存配置，不验证
+                    try {
+                        await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
+                        showToast('配置保存成功', 'success');
+                    } catch (e) { showToast('保存失败: ' + e.message, 'error'); }
+                };
+                const loadLogs = async () => {
+                    loading.value = true;
+                    try { logs.value = await fetch('/api/logs').then(r => r.json()); } catch (e) { console.error('加载日志失败', e); }
+                    loading.value = false;
+                };
+                const testMail = async () => {
+                    // 先保存配置到文件，再用保存的配置测试
+                    mailTestResult.value = null;
+                    try {
+                        await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
+                    } catch (e) { showToast('保存配置失败: ' + e.message, 'error'); return; }
+                    const result = await fetch('/api/test-mail', { method: 'POST' }).then(r => r.json());
+                    mailTestResult.value = result;
+                    showToast(result.message, result.success ? 'success' : 'error');
+                };
+                const testWebhook = async () => {
+                    // 先保存配置到文件，再用保存的配置测试
+                    webhookTestResult.value = null;
+                    try {
+                        await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config.value) });
+                    } catch (e) { showToast('保存配置失败: ' + e.message, 'error'); return; }
+                    const result = await fetch('/api/test-webhook', { method: 'POST' }).then(r => r.json());
+                    webhookTestResult.value = result;
+                    showToast(result.message, result.success ? 'success' : 'error');
+                };
+                const testMatch = () => {
+                    // 测试内容匹配规则
+                    testMatchResult.value = null;
+                    const content = testContent.value;
+                    const mode = config.value.filter.content_match.mode;
+                    const rules = config.value.filter.content_match.rules.filter(r => r.enabled && r.pattern);
+
+                    if (!content) {
+                        showToast('请输入测试内容', 'error');
+                        return;
+                    }
+                    if (rules.length === 0) {
+                        showToast('请至少添加一条启用的规则', 'error');
+                        return;
+                    }
+
+                    const matchedRules = [];
+                    try {
+                        for (const rule of rules) {
+                            const regex = new RegExp(rule.pattern, 'i');
+                            if (regex.test(content)) {
+                                matchedRules.push(rule);
+                                if (mode === 'any') break;
+                            }
+                        }
+                    } catch (e) {
+                        showToast('正则表达式错误: ' + e.message, 'error');
+                        return;
+                    }
+
+                    testMatchResult.value = matchedRules;
+                };
+                const triggerCheck = async () => {
+                    triggering.value = true;
+                    triggerResult.value = null;
+                    try { triggerResult.value = await fetch('/api/trigger', { method: 'POST' }).then(r => r.json()); loadLogs(); } catch (e) { triggerResult.value = { success: false, message: e.message }; }
+                    triggering.value = false;
+                };
+                const addRule = () => {
+                    const newId = Math.max(0, ...config.value.filter.content_match.rules.map(r => r.id)) + 1;
+                    config.value.filter.content_match.rules.push({ id: newId, pattern: '', message: '【提醒】收到邮件：{subject}\n发件人：{sender}\n内容：{content}', enabled: true });
+                };
+                const removeRule = (index) => { config.value.filter.content_match.rules.splice(index, 1); };
+                const fileInput = ref(null);
+                const exportConfig = () => {
+                    const data = JSON.stringify(config.value, null, 2);
+                    const blob = new Blob([data], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'config.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+                const triggerImport = () => { fileInput.value.click(); };
+                const importConfig = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    try {
+                        const text = await file.text();
+                        const data = JSON.parse(text);
+                        const res = await fetch('/api/config/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                        const result = await res.json();
+                        showToast(result.message, result.success ? 'success' : 'error');
+                        if (result.success) { loadConfig(); }
+                    } catch (e) { showToast('导入失败: ' + e.message, 'error'); }
+                    event.target.value = '';
+                };
+                onMounted(() => { loadConfig(); loadLogs(); loadStatus(); setInterval(loadStatus, 10000); });
+                return { activeTab, loading, triggering, config, logs, schedulerStatus, saveResult, mailTestResult, webhookTestResult, showPassword, testContent, testMatchResult, triggerResult, toast, loadConfig, saveConfig, saveMailConfig, saveWebhookConfig, loadLogs, testMail, testWebhook, testMatch, triggerCheck, addRule, removeRule, fileInput, exportConfig, triggerImport, importConfig };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

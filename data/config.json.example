@@ -1,0 +1,32 @@
+{
+  "mail": {
+    "imap_server": "imap.qq.com",
+    "imap_port": 993,
+    "username": "your_email@qq.com",
+    "password": "your_auth_code"
+  },
+  "filter": {
+    "subject_startswith": "",
+    "sender": "",
+    "content_match": {
+      "mode": "any",
+      "rules": [
+        {
+          "id": 1,
+          "pattern": "关键词.*",
+          "message": "【提醒】收到邮件：{subject}\n发件人：{sender}\n内容：{content}",
+          "enabled": true
+        }
+      ]
+    }
+  },
+  "schedule": {
+    "enabled": true,
+    "start_time": "09:00",
+    "end_time": "18:00",
+    "interval_minutes": 30
+  },
+  "webhook": {
+    "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
+  }
+}
