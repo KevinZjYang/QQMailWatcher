@@ -10,6 +10,9 @@ from src import config, mail_monitor, webhook, main
 
 app = Flask(__name__)
 
+# 启动定时任务（在 gunicorn 模式下也会启动）
+main.start_scheduler()
+
 
 @app.route('/')
 def index():

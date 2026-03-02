@@ -5,9 +5,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
-COPY static/ ./static/
-COPY templates/ ./templates/
 
 RUN mkdir -p /app/data
 
-CMD ["python", "src/web.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:3020", "src.web:app"]
