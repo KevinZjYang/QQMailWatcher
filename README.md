@@ -2,6 +2,10 @@
 
 监控QQ邮箱的特定邮件，通过企业微信Webhook发送通知。
 
+## 管理界面
+
+<img width="1535" height="1228" alt="image" src="https://github.com/user-attachments/assets/9570dda7-bf03-4b78-8ddb-146e6a895630" />
+
 ## 功能特性
 
 - IMAP邮件监控
