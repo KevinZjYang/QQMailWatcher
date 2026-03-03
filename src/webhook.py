@@ -13,11 +13,15 @@ def render_message(template, email_data):
     content = re.sub(r'\s+', ' ', content)
     full_content = re.sub(r'\s+', ' ', full_content)
 
+    # 格式化日期为中文格式
+    date_str = email_data.get('date', '')
+    formatted_date = format_date_cn(date_str)
+
     variables = {
         'subject': email_data.get('subject', ''),
         'sender': email_data.get('sender', ''),
         'content': content,
-        'date': email_data.get('date', ''),
+        'date': formatted_date,
         'full_content': full_content
     }
 
@@ -26,6 +30,26 @@ def render_message(template, email_data):
         message = message.replace(f'{{{key}}}', str(value))
 
     return message
+
+
+def format_date_cn(date_str):
+    """将邮件日期格式化为中文格式"""
+    if not date_str:
+        return ''
+
+    try:
+        # 尝试解析邮件日期格式（如: "Mon, 02 Mar 2026 08:30:00 +0800"）
+        from email.utils import parsedate_to_datetime
+        dt = parsedate_to_datetime(date_str)
+        return dt.strftime('%Y年%m月%d日 %H:%M:%S')
+    except:
+        # 如果解析失败，尝试解析 ISO 格式
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            return dt.strftime('%Y年%m月%d日 %H:%M:%S')
+        except:
+            return date_str
 
 
 def send_webhook(matched_emails):

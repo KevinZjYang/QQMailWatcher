@@ -5,6 +5,7 @@ CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'config.json')
 LOGS_FILE = os.path.join(CONFIG_DIR, 'logs.json')
 PROCESSED_FILE = os.path.join(CONFIG_DIR, 'processed.json')
+EMAILS_FILE = os.path.join(CONFIG_DIR, 'emails.json')
 
 DEFAULT_CONFIG = {
     "mail": {
@@ -108,3 +109,27 @@ def add_processed(mail_id):
         # 只保留最近500个
         processed = processed[-500:]
         save_processed(processed)
+
+
+def load_emails():
+    """加载邮件列表"""
+    if os.path.exists(EMAILS_FILE):
+        try:
+            with open(EMAILS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return []
+    return []
+
+
+def save_emails(emails):
+    """保存邮件列表"""
+    with open(EMAILS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(emails, f, ensure_ascii=False, indent=2)
+
+
+def add_emails(new_emails):
+    """添加邮件到列表（替换旧的）"""
+    # 直接替换，不合并旧的
+    emails = new_emails[:200]
+    save_emails(emails)

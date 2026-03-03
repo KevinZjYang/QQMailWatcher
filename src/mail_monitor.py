@@ -94,8 +94,15 @@ def check_email_match(mail_config, filter_config, email_data):
         return None, []
 
 
-def fetch_mails():
-    """获取匹配的邮件"""
+def fetch_mails(return_all=False):
+    """获取匹配的邮件
+
+    Args:
+        return_all: 如果为True，返回所有邮件（包括未匹配的）
+
+    Returns:
+        (matched_emails, error) - 匹配的邮件列表和错误信息
+    """
     cfg = config.load_config()
     mail_cfg = cfg.get('mail', {})
     filter_cfg = cfg.get('filter', {})
@@ -140,10 +147,11 @@ def fetch_mails():
         mail_ids = mail_ids[-mail_limit:] if len(mail_ids) > mail_limit else mail_ids
 
         matched_emails = []
+        all_emails = []  # 所有获取到的邮件
         processed_ids = config.load_processed()
 
         for mail_id in reversed(mail_ids):
-            if mail_id.decode() in processed_ids:
+            if mail_id.decode() in processed_ids and not return_all:
                 continue
 
             status, msg_data = mail.fetch(mail_id, '(RFC822)')
@@ -159,7 +167,8 @@ def fetch_mails():
             content = get_email_body(msg)
 
             # 解析邮件时间并检查是否在时间段内
-            if schedule_enabled:
+            # return_all=True 时跳过时间段过滤（用于排查）
+            if schedule_enabled and not return_all:
                 try:
                     from email.utils import parsedate_to_datetime
                     email_time = parsedate_to_datetime(date_header)
@@ -171,7 +180,8 @@ def fetch_mails():
 
                     # 检查是否在时间段内
                     if not (start_time_minutes <= email_time_minutes <= end_time_minutes):
-                        continue
+                        if not return_all:
+                            continue
                 except:
                     pass  # 如果解析失败，跳过时间过滤
 
@@ -200,7 +210,19 @@ def fetch_mails():
                 # 标记为已处理
                 config.add_processed(mail_id.decode())
 
+            # 记录所有邮件（用于排查）
+            if return_all:
+                email_data['matched'] = bool(matched_email and matched_rules)
+                email_data['matched_rule'] = matched_rules[0] if matched_rules else None
+                all_emails.append(email_data)
+
         mail.logout()
+
+        if return_all:
+            # 保存所有邮件到列表
+            config.add_emails(all_emails)
+            return all_emails, None
+
         return matched_emails, None
 
     except Exception as e:

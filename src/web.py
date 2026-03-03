@@ -57,15 +57,41 @@ def get_logs():
     return jsonify(logs)
 
 
+@app.route('/api/emails', methods=['GET'])
+def get_emails():
+    """获取邮件列表"""
+    matched_filter = request.args.get('matched')
+
+    # 获取已保存的邮件列表
+    emails = config.load_emails()
+
+    # 过滤
+    if matched_filter == 'true':
+        emails = [e for e in emails if e.get('matched', False)]
+    elif matched_filter == 'false':
+        emails = [e for e in emails if not e.get('matched', False)]
+
+    # 简化返回数据（不返回 full_content 减少传输量）
+    for email in emails:
+        if 'full_content' in email:
+            del email['full_content']
+
+    return jsonify({'success': True, 'emails': emails})
+
+
 @app.route('/api/trigger', methods=['POST'])
 def trigger_check():
     """手动触发检测"""
+    # 先获取所有邮件（用于排查）
+    all_emails, error = mail_monitor.fetch_mails(return_all=True)
+
+    # 再获取匹配的邮件用于发送webhook
     matched_emails, error = mail_monitor.fetch_mails()
 
     if error:
         config.add_log({
             "id": int(datetime.now().timestamp()),
-            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "timestamp": datetime.now().strftime('%Y年%m月%d日 %H:%M:%S'),
             "type": "manual",
             "matched_emails": 0,
             "webhook_sent": False,
@@ -76,7 +102,7 @@ def trigger_check():
     if not matched_emails:
         config.add_log({
             "id": int(datetime.now().timestamp()),
-            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "timestamp": datetime.now().strftime('%Y年%m月%d日 %H:%M:%S'),
             "type": "manual",
             "matched_emails": 0,
             "webhook_sent": False,
@@ -101,7 +127,7 @@ def trigger_check():
 
     config.add_log({
         "id": int(datetime.now().timestamp()),
-        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        "timestamp": datetime.now().strftime('%Y年%m月%d日 %H:%M:%S'),
         "type": "manual",
         "matched_emails": len(matched_emails),
         "webhook_sent": success,

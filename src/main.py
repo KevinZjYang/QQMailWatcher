@@ -99,7 +99,7 @@ def run_check():
     if now < start or now > end:
         return  # 不在时间范围内，跳过
 
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 开始检查邮件...")
+    print(f"[{datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')}] 开始检查邮件...")
 
     matched_emails, error = mail_monitor.fetch_mails()
 
@@ -107,7 +107,7 @@ def run_check():
         print(f"检查邮件失败: {error}")
         config.add_log({
             "id": int(datetime.now().timestamp()),
-            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "timestamp": datetime.now().strftime('%Y年%m月%d日 %H:%M:%S'),
             "type": "scheduled",
             "matched_emails": 0,
             "webhook_sent": False,
@@ -119,7 +119,7 @@ def run_check():
         print("没有匹配的邮件")
         config.add_log({
             "id": int(datetime.now().timestamp()),
-            "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "timestamp": datetime.now().strftime('%Y年%m月%d日 %H:%M:%S'),
             "type": "scheduled",
             "matched_emails": 0,
             "webhook_sent": False,
@@ -134,7 +134,7 @@ def run_check():
 
     config.add_log({
         "id": int(datetime.now().timestamp()),
-        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        "timestamp": datetime.now().strftime('%Y年%m月%d日 %H:%M:%S'),
         "type": "scheduled",
         "matched_emails": len(matched_emails),
         "webhook_sent": success,
@@ -155,7 +155,7 @@ def get_scheduler_status():
     """获取调度器状态"""
     from datetime import datetime
     status = scheduler_status.copy()
-    status["current_time"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    status["current_time"] = datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
 
     # 计算下次运行时间
     if status["running"] and status["in_time_range"]:

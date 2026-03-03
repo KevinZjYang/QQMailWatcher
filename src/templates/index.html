@@ -330,6 +330,7 @@
             <div class="tabs">
                 <button class="tab" :class="{active: activeTab === 'config'}" @click="activeTab = 'config'">配置管理</button>
                 <button class="tab" :class="{active: activeTab === 'logs'}" @click="activeTab = 'logs'">运行日志</button>
+                <button class="tab" :class="{active: activeTab === 'emails'}" @click="activeTab = 'emails'">邮件列表</button>
                 <button class="tab" :class="{active: activeTab === 'action'}" @click="activeTab = 'action'">手动操作</button>
             </div>
 
@@ -508,6 +509,41 @@
                 </table>
             </div>
 
+            <!-- 邮件列表 -->
+            <div v-if="activeTab === 'emails'" class="card">
+                <h2>邮件列表 <button class="btn btn-secondary" style="margin-left: 12px; padding: 4px 12px; font-size: 12px;" @click="fetchAllEmails">重新获取邮件</button></h2>
+                <div style="margin-bottom: 16px;">
+                    <label style="margin-right: 12px;">
+                        <input type="radio" name="emailFilter" value="" v-model="emailFilter" @change="loadEmails"> 全部
+                    </label>
+                    <label style="margin-right: 12px;">
+                        <input type="radio" name="emailFilter" value="true" v-model="emailFilter" @change="loadEmails"> 已匹配
+                    </label>
+                    <label>
+                        <input type="radio" name="emailFilter" value="false" v-model="emailFilter" @change="loadEmails"> 未匹配
+                    </label>
+                </div>
+                <div v-if="emailsLoading" class="loading">加载中...</div>
+                <div v-else-if="emails.length === 0" style="text-align: center; color: #999; padding: 40px;">
+                    暂无邮件记录，请点击"重新获取邮件"按钮
+                </div>
+                <div v-else>
+                    <div v-for="(email, index) in emails" :key="index" class="email-item" style="border-left: 4px solid;" :style="{ borderLeftColor: email.matched ? '#10b981' : '#9ca3af' }">
+                        <h4>
+                            <span :style="{ color: email.matched ? '#10b981' : '#666' }">{{ email.matched ? '✓ 已匹配' : '○ 未匹配' }}</span>
+                            {{ email.subject }}
+                        </h4>
+                        <p><strong>发件人：</strong>{{ email.sender }}</p>
+                        <p><strong>日期：</strong>{{ formatDate(email.date) }}</p>
+                        <p><strong>内容摘要：</strong>{{ email.content }}</p>
+                        <div v-if="email.matched && email.matched_rule" style="margin-top: 8px; padding: 8px; background: #ecfdf5; border-radius: 4px;">
+                            <p><strong>匹配规则：</strong>{{ email.matched_rule.pattern }}</p>
+                            <p><strong>消息模板：</strong>{{ email.matched_rule.message }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 手动操作 -->
             <div v-if="activeTab === 'action'" class="card">
                 <h2>手动操作</h2>
@@ -546,6 +582,9 @@
                     webhook: { url: '' }
                 });
                 const logs = ref([]);
+                const emails = ref([]);
+                const emailsLoading = ref(false);
+                const emailFilter = ref('');
                 const schedulerStatus = ref({ running: false, enabled: true, in_time_range: false, current_time: '', next_run: null, start_time: '', end_time: '' });
                 const saveResult = ref(null);
                 const mailTestResult = ref(null);
@@ -559,6 +598,38 @@
                 const showToast = (message, type = 'success') => {
                     toast.value = { show: true, message, type };
                     setTimeout(() => { toast.value.show = false; }, 3000);
+                };
+
+                // 格式化日期为中文格式
+                const formatDate = (dateStr) => {
+                    if (!dateStr) return '';
+                    try {
+                        // 尝试解析邮件日期格式
+                        const date = new Date(dateStr);
+                        if (isNaN(date.getTime())) {
+                            // 如果解析失败，尝试解析英文格式
+                            const enDate = new Date(dateStr.replace(/([A-Za-z]{3}),?\s*/, ''));
+                            if (!isNaN(enDate.getTime())) {
+                                const y = enDate.getFullYear();
+                                const m = String(enDate.getMonth() + 1).padStart(2, '0');
+                                const d = String(enDate.getDate()).padStart(2, '0');
+                                const h = String(enDate.getHours()).padStart(2, '0');
+                                const min = String(enDate.getMinutes()).padStart(2, '0');
+                                const s = String(enDate.getSeconds()).padStart(2, '0');
+                                return `${y}年${m}月${d}日 ${h}:${min}:${s}`;
+                            }
+                            return dateStr;
+                        }
+                        const y = date.getFullYear();
+                        const m = String(date.getMonth() + 1).padStart(2, '0');
+                        const d = String(date.getDate()).padStart(2, '0');
+                        const h = String(date.getHours()).padStart(2, '0');
+                        const min = String(date.getMinutes()).padStart(2, '0');
+                        const s = String(date.getSeconds()).padStart(2, '0');
+                        return `${y}年${m}月${d}日 ${h}:${min}:${s}`;
+                    } catch (e) {
+                        return dateStr;
+                    }
                 };
 
                 const loadConfig = async () => {
@@ -598,6 +669,34 @@
                     loading.value = true;
                     try { logs.value = await fetch('/api/logs').then(r => r.json()); } catch (e) { console.error('加载日志失败', e); }
                     loading.value = false;
+                };
+                const loadEmails = async () => {
+                    emailsLoading.value = true;
+                    try {
+                        const filter = emailFilter.value ? `&matched=${emailFilter.value}` : '';
+                        const res = await fetch(`/api/emails?${filter}`);
+                        const data = await res.json();
+                        emails.value = data.emails || [];
+                    } catch (e) { console.error('加载邮件失败', e); }
+                    emailsLoading.value = false;
+                };
+                const fetchAllEmails = async () => {
+                    emailsLoading.value = true;
+                    showToast('正在获取邮件...', 'success');
+                    try {
+                        const res = await fetch('/api/trigger', { method: 'POST' });
+                        const data = await res.json();
+                        if (data.success) {
+                            showToast('邮件获取成功', 'success');
+                        } else {
+                            showToast(data.message || '获取失败', 'error');
+                        }
+                        // 重新加载邮件列表
+                        await loadEmails();
+                    } catch (e) {
+                        showToast('获取失败: ' + e.message, 'error');
+                    }
+                    emailsLoading.value = false;
                 };
                 const testMail = async () => {
                     // 先保存配置到文件，再用保存的配置测试
@@ -687,8 +786,8 @@
                     } catch (e) { showToast('导入失败: ' + e.message, 'error'); }
                     event.target.value = '';
                 };
-                onMounted(() => { loadConfig(); loadLogs(); loadStatus(); setInterval(loadStatus, 10000); });
-                return { activeTab, loading, triggering, config, logs, schedulerStatus, saveResult, mailTestResult, webhookTestResult, showPassword, testContent, testMatchResult, triggerResult, toast, loadConfig, saveConfig, saveMailConfig, saveWebhookConfig, loadLogs, testMail, testWebhook, testMatch, triggerCheck, addRule, removeRule, fileInput, exportConfig, triggerImport, importConfig };
+                onMounted(() => { loadConfig(); loadLogs(); loadStatus(); loadEmails(); setInterval(loadStatus, 10000); });
+                return { activeTab, loading, triggering, config, logs, emails, emailsLoading, emailFilter, schedulerStatus, saveResult, mailTestResult, webhookTestResult, showPassword, testContent, testMatchResult, triggerResult, toast, formatDate, loadConfig, saveConfig, saveMailConfig, saveWebhookConfig, loadLogs, loadEmails, fetchAllEmails, testMail, testWebhook, testMatch, triggerCheck, addRule, removeRule, fileInput, exportConfig, triggerImport, importConfig };
             }
         }).mount('#app');
     </script>
