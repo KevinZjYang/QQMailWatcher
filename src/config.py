@@ -37,6 +37,10 @@ DEFAULT_CONFIG = {
     },
     "webhook": {
         "url": ""
+    },
+    "admin": {
+        "username": "admin",
+        "password": "admin123"
     }
 }
 

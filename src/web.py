@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from datetime import datetime
+from functools import wraps
 import sys
 import os
 
@@ -9,6 +10,26 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from src import config, mail_monitor, webhook, main
 
 app = Flask(__name__)
+
+
+def require_auth(f):
+    """认证装饰器"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        password = request.headers.get('X-Admin-Password', '')
+        cfg = config.load_config()
+        admin_cfg = cfg.get('admin', {})
+        stored_password = admin_cfg.get('password', 'admin123')
+
+        # 如果密码为空，则不启用认证
+        if not stored_password:
+            return f(*args, **kwargs)
+
+        if password != stored_password:
+            return jsonify({'success': False, 'message': '未授权'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 # 启动定时任务（在 gunicorn 模式下也会启动）
 main.start_scheduler()
@@ -20,7 +41,46 @@ def index():
     return send_from_directory(os.path.join(os.path.dirname(__file__), 'templates'), 'index.html')
 
 
+@app.route('/api/login', methods=['POST'])
+def login():
+    """登录验证"""
+    data = request.get_json()
+    username = data.get('username', '')
+    password = data.get('password', '')
+
+    cfg = config.load_config()
+    admin_cfg = cfg.get('admin', {})
+
+    stored_username = admin_cfg.get('username', 'admin')
+    stored_password = admin_cfg.get('password', 'admin123')
+
+    # 如果密码为空，则不启用认证
+    if not stored_password:
+        return jsonify({'success': True, 'message': '登录成功'})
+
+    if username == stored_username and password == stored_password:
+        return jsonify({'success': True, 'message': '登录成功'})
+    return jsonify({'success': False, 'message': '用户名或密码错误'}), 401
+
+
+@app.route('/api/check-auth', methods=['GET'])
+def check_auth():
+    """检查认证状态"""
+    password = request.headers.get('X-Admin-Password', '')
+    cfg = config.load_config()
+    admin_cfg = cfg.get('admin', {})
+    stored_password = admin_cfg.get('password', 'admin123')
+
+    if not stored_password:
+        return jsonify({'success': True, 'authenticated': True})
+
+    if password == stored_password:
+        return jsonify({'success': True, 'authenticated': True})
+    return jsonify({'success': True, 'authenticated': False})
+
+
 @app.route('/api/status', methods=['GET'])
+@require_auth
 def get_status():
     """获取调度器状态"""
     status = main.get_scheduler_status()
@@ -28,6 +88,7 @@ def get_status():
 
 
 @app.route('/api/config', methods=['GET'])
+@require_auth
 def get_config():
     """获取配置"""
     cfg = config.load_config()
@@ -36,9 +97,12 @@ def get_config():
 
 
 @app.route('/api/config', methods=['POST'])
+@require_auth
 def save_config():
     """保存配置"""
     data = request.get_json()
+
+    print(f"[DEBUG] save_config received: {data}")
 
     # 获取现有配置，保留密码（空字符串或***都保留原有密码）
     existing = config.load_config()
@@ -46,11 +110,43 @@ def save_config():
     if not password or password == '***':
         data['mail']['password'] = existing.get('mail', {}).get('password', '')
 
+    # 保留现有 admin 配置（如果没有传 admin 字段或字段不完整）
+    if 'admin' not in data:
+        data['admin'] = existing.get('admin', {})
+        print(f"[DEBUG] No admin in data, using existing: {data['admin']}")
+    else:
+        admin_data = data.get('admin', {})
+        existing_admin = existing.get('admin', {})
+
+        print(f"[DEBUG] admin_data from frontend: {admin_data}")
+        print(f"[DEBUG] existing_admin: {existing_admin}")
+
+        # 如果传了 admin 且有 password 且不为空，使用新密码
+        # 否则保留旧密码
+        if admin_data.get('password'):
+            # 使用前端传来的新密码
+            print(f"[DEBUG] Using new password: {admin_data['password']}")
+        else:
+            admin_data['password'] = existing_admin.get('password', 'admin123')
+            print(f"[DEBUG] Keeping old password: {admin_data['password']}")
+
+        # 如果传了 admin 且有 username 且不为空，使用新用户名
+        # 否则保留旧用户名
+        if admin_data.get('username'):
+            pass  # 使用前端传来的新用户名
+        else:
+            admin_data['username'] = existing_admin.get('username', 'admin')
+
+        data['admin'] = admin_data
+        print(f"[DEBUG] Final admin data to save: {data['admin']}")
+
     config.save_config(data)
+    print(f"[DEBUG] Saved config successfully")
     return jsonify({'success': True})
 
 
 @app.route('/api/logs', methods=['GET'])
+@require_auth
 def get_logs():
     """获取日志"""
     logs = config.load_logs()
@@ -58,6 +154,7 @@ def get_logs():
 
 
 @app.route('/api/emails', methods=['GET'])
+@require_auth
 def get_emails():
     """获取邮件列表"""
     matched_filter = request.args.get('matched')
@@ -80,6 +177,7 @@ def get_emails():
 
 
 @app.route('/api/trigger', methods=['POST'])
+@require_auth
 def trigger_check():
     """手动触发检测"""
     # 先获取所有邮件（用于排查）
@@ -142,6 +240,7 @@ def trigger_check():
 
 
 @app.route('/api/test-regex', methods=['POST'])
+@require_auth
 def test_regex():
     """测试正则表达式"""
     data = request.get_json()
@@ -153,6 +252,7 @@ def test_regex():
 
 
 @app.route('/api/test-mail', methods=['POST'])
+@require_auth
 def test_mail_connection():
     """测试邮箱连接（从配置文件读取）"""
     success, message = mail_monitor.test_connection()
@@ -160,6 +260,7 @@ def test_mail_connection():
 
 
 @app.route('/api/test-webhook', methods=['POST'])
+@require_auth
 def test_webhook_connection():
     """测试Webhook连接（从配置文件读取）"""
     success, message = webhook.test_webhook()
@@ -167,6 +268,7 @@ def test_webhook_connection():
 
 
 @app.route('/api/config/export', methods=['GET'])
+@require_auth
 def export_config():
     """导出配置"""
     cfg = config.load_config()
@@ -175,6 +277,7 @@ def export_config():
 
 
 @app.route('/api/config/import', methods=['POST'])
+@require_auth
 def import_config():
     """导入配置"""
     try:

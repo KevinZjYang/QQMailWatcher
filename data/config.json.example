@@ -1,4 +1,8 @@
 {
+  "admin": {
+    "username": "admin",
+    "password": "admin123"
+  },
   "mail": {
     "imap_server": "imap.qq.com",
     "imap_port": 993,
